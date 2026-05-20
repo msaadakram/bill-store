@@ -1,5 +1,8 @@
-import { headers } from "next/headers";
 import { LescoBillDetailClient } from "./LescoBillDetailClient";
+import {
+  fetchLescoBill,
+  fetchLescoBillRedirect,
+} from "@/lib/server/lescoPitc";
 
 interface BillData {
   customerName: string;
@@ -26,48 +29,6 @@ interface BillData {
   subDivision: string;
 }
 
-interface ApiResponse {
-  success: boolean;
-  data?: BillData;
-  error?: string;
-  redirectUrl?: string;
-}
-
-function getBaseUrl() {
-  const hdrs = headers();
-  const proto = hdrs.get("x-forwarded-proto") || "http";
-  const host = hdrs.get("x-forwarded-host") || hdrs.get("host") || "localhost:3000";
-  return `${proto}://${host}`;
-}
-
-async function fetchBillFromApi(baseUrl: string, refno: string, type: string): Promise<ApiResponse> {
-  try {
-    const res = await fetch(`${baseUrl}/api/bill/lesco`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ refno, type: type || "U" }),
-      cache: "no-store",
-    });
-    return await res.json();
-  } catch {
-    return { success: false, error: "Network error while fetching bill" };
-  }
-}
-
-async function fetchBillViaPitcPage(baseUrl: string, refno: string, type: string): Promise<ApiResponse> {
-  try {
-    const res = await fetch(`${baseUrl}/api/bill/lesco/redirect`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ refno, type: type || "U" }),
-      cache: "no-store",
-    });
-    return await res.json();
-  } catch {
-    return { success: false, error: "Network error" };
-  }
-}
-
 function getTypesToTry(mode: string | undefined) {
   const typeFromMode = mode === "customer" ? "C" : mode === "reference" ? "R" : "U";
   return Array.from(new Set([typeFromMode, "U", "R", "C"]));
@@ -83,7 +44,6 @@ export default async function LescoBillDetailPage({
   const { refno } = await params;
   const mode = (await searchParams)?.mode;
   const typesToTry = getTypesToTry(mode);
-  const baseUrl = getBaseUrl();
 
   let bill: BillData | null = null;
   let error = "";
@@ -92,22 +52,24 @@ export default async function LescoBillDetailPage({
 
   for (const type of typesToTry) {
     typeUsed = type;
-    const result = await fetchBillFromApi(baseUrl, refno, type);
+    const result = await fetchLescoBill(refno, type);
     if (result.success && result.data) {
       bill = result.data;
       break;
     }
 
-    if (result.error && result.error.includes("redirect")) {
-      pitcRedirect =
-        result.redirectUrl ||
-        `https://bill.pitc.com.pk/gbill.aspx?refno=${refno}&type=${type}`;
+    if (result.redirectUrl) {
+      pitcRedirect = result.redirectUrl;
     }
 
-    const redirectResult = await fetchBillViaPitcPage(baseUrl, refno, type);
+    const redirectResult = await fetchLescoBillRedirect(refno, type);
     if (redirectResult.success && redirectResult.data) {
       bill = redirectResult.data;
       break;
+    }
+
+    if (redirectResult.redirectUrl) {
+      pitcRedirect = redirectResult.redirectUrl;
     }
 
     error = result.error || redirectResult.error || error;
