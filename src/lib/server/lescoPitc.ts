@@ -1,6 +1,7 @@
 const PITC_URL = "https://bill.pitc.com.pk/gbill.aspx";
 const PITC_BASE = "https://bill.pitc.com.pk";
 const PITC_PATH = "/gbill.aspx";
+const PITC_PROXY_URL = process.env.PITC_PROXY_URL || "";
 const REQUEST_VERIFICATION_TOKEN =
   "dltUxN3F1zaT6K3bsC0iN_3YmcxJYntiOX1xA7pTZie-xkzRXXyQRijHW94kljqVOtPFEp4lNs8HG19vmaTyZug_zWiz9uonytecveXelzo1";
 
@@ -59,11 +60,83 @@ function getSetCookieArray(headers: Headers) {
   return raw ? [raw] : [];
 }
 
+async function parseProxyResponse(res: Response, refno: string): Promise<ApiResponse> {
+  const contentType = res.headers.get("content-type") || "";
+  if (contentType.includes("application/json")) {
+    const json = await res.json();
+    if (json && typeof json === "object") {
+      if (json.success && json.data) {
+        return { success: true, data: json.data };
+      }
+      if (json.html && typeof json.html === "string") {
+        if (/consumer not found|no record found/i.test(json.html)) {
+          return { success: false, error: "Consumer not found" };
+        }
+        return { success: true, data: parseBillHtml(json.html, refno) };
+      }
+      if (json.error) {
+        return { success: false, error: json.error };
+      }
+    }
+  }
+
+  const text = await res.text();
+  if (!res.ok) {
+    return { success: false, error: `Proxy fetch failed (${res.status})` };
+  }
+  if (/consumer not found|no record found/i.test(text)) {
+    return { success: false, error: "Consumer not found" };
+  }
+  if (text.length < 200) {
+    return { success: false, error: "Proxy response too short" };
+  }
+  return { success: true, data: parseBillHtml(text, refno) };
+}
+
+async function fetchViaProxy(refno: string, type: string): Promise<ApiResponse | null> {
+  if (!PITC_PROXY_URL) return null;
+
+  try {
+    const postRes = await fetch(PITC_PROXY_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json,text/html",
+      },
+      body: JSON.stringify({ refno, type, company: "lesco" }),
+      cache: "no-store",
+    });
+
+    if (postRes.ok) {
+      return await parseProxyResponse(postRes, refno);
+    }
+
+    if (postRes.status !== 404 && postRes.status !== 405) {
+      return await parseProxyResponse(postRes, refno);
+    }
+
+    const joiner = PITC_PROXY_URL.includes("?") ? "&" : "?";
+    const getUrl = `${PITC_PROXY_URL}${joiner}refno=${encodeURIComponent(refno)}&type=${encodeURIComponent(type || "U")}`;
+    const getRes = await fetch(getUrl, {
+      method: "GET",
+      headers: { Accept: "application/json,text/html" },
+      cache: "no-store",
+    });
+
+    return await parseProxyResponse(getRes, refno);
+  } catch (error: any) {
+    return { success: false, error: error?.message || "Proxy fetch failed" };
+  }
+}
+
 export async function fetchLescoBill(refno: string, type = "U"): Promise<ApiResponse> {
   try {
     if (!refno) {
       return { success: false, error: "Reference number is required" };
     }
+
+    const proxyResult = await fetchViaProxy(refno, type);
+    if (proxyResult) return proxyResult;
 
     const sessionRes = await fetch(PITC_URL, {
       method: "GET",
@@ -145,6 +218,9 @@ export async function fetchLescoBillRedirect(
     if (!refno) {
       return { success: false, error: "Reference number is required" };
     }
+
+    const proxyResult = await fetchViaProxy(refno, type);
+    if (proxyResult) return proxyResult;
 
     const url = `${PITC_BASE}${PITC_PATH}?refno=${encodeURIComponent(refno)}&type=${encodeURIComponent(type || "U")}`;
 

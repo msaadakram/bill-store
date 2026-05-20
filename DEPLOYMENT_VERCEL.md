@@ -9,6 +9,7 @@ This Next.js app is ready for deployment to Vercel. Follow these steps:
 2. Configure Environment Variables
     - In Vercel > Project > Settings > Environment Variables, add the following keys:
        - NEXT_PUBLIC_ADMIN_API_URL — the public URL for your backend API
+   - PITC_PROXY_URL — optional proxy URL for PITC bill fetches (server-side)
 
 3. Build & Deploy
    - Vercel will run `npm run build` automatically.
