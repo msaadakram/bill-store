@@ -77,11 +77,11 @@ export default async function LescoBillDetailPage({
   params,
   searchParams,
 }: {
-  params: { refno: string };
-  searchParams?: { mode?: string };
+  params: Promise<{ refno: string }>;
+  searchParams?: Promise<{ mode?: string }>;
 }) {
-  const { refno } = params;
-  const mode = searchParams?.mode;
+  const { refno } = await params;
+  const mode = (await searchParams)?.mode;
   const typesToTry = getTypesToTry(mode);
   const baseUrl = getBaseUrl();
 
