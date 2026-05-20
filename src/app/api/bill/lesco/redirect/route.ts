@@ -6,6 +6,13 @@ const TOKEN =
 const PITC_BASE = "https://bill.pitc.com.pk";
 const PITC_PATH = "/gbill.aspx";
 
+function extractVerificationToken(html: string) {
+  const match = html.match(
+    /name="__RequestVerificationToken"[^>]*value="([^"]+)"/i,
+  );
+  return match ? match[1] : "";
+}
+
 /**
  * This endpoint follows the PITC redirect chain with the verification token.
  * PITC's gbill.aspx does a 302 redirect (Object moved) - this endpoint
@@ -43,12 +50,16 @@ export async function POST(request: NextRequest) {
       .map((c) => c.split(";")[0])
       .join("; ");
 
+    const getHtml = await getRes.text();
+    const tokenFromPage = extractVerificationToken(getHtml);
+    const requestToken = tokenFromPage || TOKEN;
+
     const redirectUrl = getRes.headers.get("location");
     const isRedirect = getRes.status === 302;
 
     // Step 2: POST with the verification token to follow through
     const postData = new URLSearchParams();
-    postData.append("__RequestVerificationToken", TOKEN);
+    postData.append("__RequestVerificationToken", requestToken);
     postData.append("refno", refno);
     postData.append("type", type || "U");
 
@@ -97,6 +108,12 @@ export async function POST(request: NextRequest) {
       const html = await finalRes.text();
 
       if (html.length > 500) {
+        if (/consumer not found|no record found/i.test(html)) {
+          return NextResponse.json(
+            { success: false, error: "Consumer not found" },
+            { status: 404 },
+          );
+        }
         const billData = parseBillHtml(html, refno);
         return NextResponse.json({ success: true, data: billData });
       }
@@ -111,6 +128,13 @@ export async function POST(request: NextRequest) {
         error: "PITC redirect loop - please open the bill directly",
         redirectUrl: url,
       });
+    }
+
+    if (/consumer not found|no record found/i.test(html)) {
+      return NextResponse.json(
+        { success: false, error: "Consumer not found" },
+        { status: 404 },
+      );
     }
 
     const billData = parseBillHtml(html, refno);

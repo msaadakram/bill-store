@@ -4,6 +4,13 @@ const PITC_URL = "https://bill.pitc.com.pk/gbill.aspx";
 const REQUEST_VERIFICATION_TOKEN =
   "dltUxN3F1zaT6K3bsC0iN_3YmcxJYntiOX1xA7pTZie-xkzRXXyQRijHW94kljqVOtPFEp4lNs8HG19vmaTyZug_zWiz9uonytecveXelzo1";
 
+function extractVerificationToken(html: string) {
+  const match = html.match(
+    /name="__RequestVerificationToken"[^>]*value="([^"]+)"/i,
+  );
+  return match ? match[1] : "";
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -34,6 +41,9 @@ export async function POST(request: NextRequest) {
     const aspNetSessionId = setCookieHeader
       ? setCookieHeader.split(";")[0]
       : "";
+    const sessionHtml = await sessionRes.text();
+    const tokenFromPage = extractVerificationToken(sessionHtml);
+    const requestToken = tokenFromPage || REQUEST_VERIFICATION_TOKEN;
 
     if (!aspNetSessionId) {
       return NextResponse.json(
@@ -44,7 +54,7 @@ export async function POST(request: NextRequest) {
 
     // Step 2: POST with verification token and reference number
     const postData = new URLSearchParams();
-    postData.append("__RequestVerificationToken", REQUEST_VERIFICATION_TOKEN);
+    postData.append("__RequestVerificationToken", requestToken);
     postData.append("refno", refno);
     postData.append("type", type || "U");
 
@@ -74,6 +84,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { success: false, error: "Failed to fetch bill from PITC" },
         { status: 502 },
+      );
+    }
+
+    if (/consumer not found|no record found/i.test(html)) {
+      return NextResponse.json(
+        { success: false, error: "Consumer not found" },
+        { status: 404 },
       );
     }
 
