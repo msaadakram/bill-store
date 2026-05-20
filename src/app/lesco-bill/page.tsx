@@ -141,7 +141,7 @@ export default function LescoBillPage() {
     if (!validate()) return;
     setIsSubmitting(true);
     addToHistory(inputValue, mode);
-    router.push(`/lesco-bill/${encodeURIComponent(inputValue)}`);
+    router.push(`/lesco-bill/${encodeURIComponent(inputValue)}?mode=${mode}`);
   };
 
   const switchMode = (m: InputMode) => {
