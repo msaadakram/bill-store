@@ -1,0 +1,18 @@
+@import 'tailwindcss' source(none);
+@source '../**/*.{js,ts,jsx,tsx}';
+
+@import 'tw-animate-css';
+
+/* ═══════════════════════════════════════════════════════════════
+   Typography System — mapped to Tailwind utility classes
+   font-sans  → Plus Jakarta Sans  (UI, body, buttons, labels)
+   font-serif → Playfair Display   (display headings, titles)
+   font-mono  → JetBrains Mono     (code, reference numbers)
+   font-reading → Source Serif 4   (long-form article body)
+   ═══════════════════════════════════════════════════════════════ */
+@theme {
+  --font-sans: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-serif: 'Playfair Display', Georgia, 'Times New Roman', serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', ui-monospace, monospace;
+  --font-reading: 'Source Serif 4', 'Georgia', 'Cambria', 'Times New Roman', serif;
+}

@@ -1,0 +1,31 @@
+@import './fonts.css';
+@import './tailwind.css';
+@import './theme.css';
+@import './design-system.css';
+
+/* ═══════════════════════════════════════════════════════════════
+   Global Typography Enhancements
+   ═══════════════════════════════════════════════════════════════ */
+
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: "kern" 1, "liga" 1, "calt" 1;
+}
+
+/* Enhanced heading kerning */
+h1, h2, h3, h4, h5, h6 {
+  text-wrap: balance;
+  letter-spacing: -0.02em;
+}
+
+/* Better reading experience for paragraphs */
+p {
+  text-wrap: pretty;
+}
+
+/* Smooth font-family transitions */
+* {
+  -webkit-font-smoothing: antialiased;
+}
